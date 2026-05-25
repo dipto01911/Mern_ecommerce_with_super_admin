@@ -1,0 +1,444 @@
+import { useEffect, useState } from "react";
+import Paginate from "../helper/Paginate";
+import invoiceStore from "../store/invoiceStore";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import Skeleton from "react-loading-skeleton";
+import { ErrorToast, formatDate } from "../helper/helper";
+import { baseURL } from "../helper/config";
+import {ToWords} from 'to-words'
+
+
+const AllOrders = () => {
+const [searchParams]=useSearchParams();
+const navigate=useNavigate();
+const per_page=6;
+const page_no=searchParams.get("page_no") || 1;
+const [fromDate,setFromDate]=useState("");
+const [toDate,setToDate]=useState("");
+
+ let {allOrderList,totalAllOrderList,allOrderListRequest,readSingleInvoiceSingleUser,
+  singleInvoiceSingleUserRequest,updateInvoiceRequest
+ }=invoiceStore(); 
+
+let updateInvoice=async(_id,user_id,deliver_status)=>{
+  let res=await updateInvoiceRequest({_id,user_id,deliver_status})
+  if(res){
+    await allOrderListRequest(per_page,page_no)
+  }
+};
+
+
+ //display all order
+useEffect(()=>{
+  (async()=>{
+    await allOrderListRequest(per_page,page_no)
+  })()
+},[allOrderListRequest,per_page,page_no])
+
+//handle pagination
+const handelPageClick=async(event)=>{
+  let page_no=event.selected;
+  await allOrderListRequest(per_page,page_no)
+  navigate(`/all-orders?page_no=${page_no+1}`);
+}
+
+//download csv
+
+const handelDownload=()=>{
+  try{
+let url=baseURL+"/export-csv";
+window.open(url,"_blank");
+  }catch(err){
+    console.log(err)
+    ErrorToast("Something went wrong!")
+  }
+}
+
+let viewOrder=(id)=>{
+  singleInvoiceSingleUserRequest(id)
+}
+
+const toWords=new ToWords();
+
+const redirect=()=>{
+  navigate('/')
+}
+
+
+  return (
+    <div className="dashboard-body__content">
+      {/* ========================= Statement section start =========================== */}
+      <div className="card shadow-sm p-3 mb-4">
+        <div className="row g-3 align-items-end">
+          <div className="col-md-3">
+            <label className="form-label fw-semibold">From Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={"December 17, 2025"}
+            />
+          </div>
+
+          <div className="col-md-3">
+            <label className="form-label fw-semibold">To Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={"December 17, 2025"}
+            />
+          </div>
+
+          <div className="col-md-3 text-center">
+            <button onClick={handelDownload} className="btn d-block btn-primary px-4 mt-2">
+              Download CSV
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="row gy-4">
+        <div className="col-12">
+          <div className="card common-card border border-gray-five">
+            <div className="card-body">
+              <div className="table-responsive">
+                <table className="table text-body mt--24">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Customer name</th>
+                      <th>Order ID</th>
+                      <th>Payment status</th>
+                      <th>Deliver status</th>
+                      <th>Deliver Action</th>
+                      <th>Total Payable</th>
+                      <th>Invoice</th>
+                    </tr>
+                  </thead>
+
+          <tbody>
+                    {allOrderList?.length < 1 && <p>No data found!</p>}
+
+                    {allOrderList === null ? (
+                      <>
+                        <>
+                          {[...Array(6)].map(() => (
+                            <tr className='super_admin_all-product'>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                              <td className='Skeleton'>
+                                <Skeleton count={1} />
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      </>
+                    ) : (
+                      <>
+                        {allOrderList?.map((item, index) => (
+                          <tr key={index}>
+                            <td>{formatDate(item?.createdAt)}</td>
+                            <td>{item?.cus_details?.[0]?.Name}</td>
+
+                            <td>
+                              <span>{item?._id}</span>
+                            </td>
+                            <td>
+                              <span
+                                className={`badge text-capitalize rounded-pill ${
+                                  item?.payment_status === "success"
+                                    ? "bg-success"
+                                    : item?.payment_status === "pending"
+                                    ? "bg-warning"
+                                    : "bg-danger"
+                                }`}
+                              >
+                                {item?.payment_status}
+                              </span>
+                            </td>
+                            <td>
+                              <span
+                                className={`badge text-capitalize rounded-pill ${
+                                  item?.delivery_status === "delivered"
+                                    ? "bg-success"
+                                    : item?.delivery_status === "pending"
+                                    ? "bg-warning"
+                                    : "bg-danger"
+                                }`}
+                              >
+                                {item?.delivery_status}
+                              </span>
+                            </td>
+                            <td>
+                              <button>
+                                <select
+                                  onChange={(e) =>
+                                    updateInvoice(
+                                      item?._id,
+                                      item?.user_id,
+                                      e.target.value
+                                    )
+                                  }
+                                  className=' common-input border custom'
+                                  defaultValue={item?.deliver_status}
+                                >
+                                  <option value={"pending"}>Pending</option>
+                                  <option value={"delivered"}>Delivered</option>
+                                  <option value={"cancel"}>Cancel</option>
+                                </select>
+                              </button>
+                            </td>
+
+                            <td>
+                              <p> {item?.payable}</p>
+                            </td>
+                            <td>
+                              <button
+                                className='btn btn-success'
+                                data-bs-toggle='modal'
+                                data-bs-target={`#exampleModal_1`}
+                                onClick={() => viewOrder(item?._id)}
+                              >
+                                View
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                  </tbody>
+       
+          
+
+                </table>
+              </div>
+              <div className="flx-between justify-content-end gap-2">
+                <nav aria-label="Page navigation example">
+                  <div>
+                    <Paginate handelPageClick={handelPageClick} page_no={page_no} per_page={per_page} totalCount={totalAllOrderList} />
+                  </div>
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* ========================= Statement section End =========================== */}
+
+      {/*  */}
+      <>
+        <div
+          className="modal fade order_item"
+          id={`exampleModal_1`}
+          tabIndex={-1}
+          aria-labelledby="exampleModalLabel"
+          aria-hidden="true"
+        >
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h6 className="modal-title fs-5" id="exampleModalLabel">
+                  Super Admin Invoice View
+                </h6>
+                <button
+                  type="button"
+                  className="btn-close"
+                  data-bs-dismiss="modal"
+                  aria-label="Close"
+                />
+              </div>
+              <div className="modal-body">
+                <div className="profile">
+                  <div className="row gy-4">
+                    <div className="col-12">
+                      <div className="container my-5">
+                        {/* Invoice Content */}
+                        <div className="p-5 bg-white">
+                          {/* Header */}
+                          <div className="row mb-4 border-bottom pb-3">
+                            <div className="col-sm-6">
+                              <h2 className="fw-bold">INVOICE</h2>
+                              <p className="mb-0">{readSingleInvoiceSingleUser?._id}</p>
+                              <p className="mb-0">
+                                {readSingleInvoiceSingleUser?.tran_id}
+                              </p>
+                              <small>{formatDate(readSingleInvoiceSingleUser?.createdAt)}</small>
+                            </div>
+                            <div className="col-sm-6 text-end">
+                              <h5 className="fw-bold">Ecommerce</h5>
+                              <p className="mb-0">123 Street, Chittagong</p>
+                              <p className="mb-0">support@pixbo.com</p>
+                              <p className="mb-0">+880 1234 567 890</p>
+                            </div>
+                          </div>
+
+                          {/* Billing Details */}
+                          <div className="row mb-4">
+                            <div className="col-sm-6">
+                              <h6 className="fw-bold">Bill To:</h6>
+                              <p className="mb-0">{readSingleInvoiceSingleUser?.cus_details[0]?.Name}</p>
+
+                            <p className="mb-0">{readSingleInvoiceSingleUser?.cus_details[0]?.Email}</p>
+                              <p className="mb-0">{readSingleInvoiceSingleUser?.cus_details[0]?.Phone}</p>
+                              <p className="mb-0">
+                                {readSingleInvoiceSingleUser?.cus_details[0]?.Address}
+                              </p>
+                            </div>
+                            <div className="col-sm-6 text-end">
+                              <h6 className="fw-bold">Payment information: </h6>
+                              <p className="mb-1">
+                                Payment Status:{" "}
+                                
+                                 <span
+                                  className={`fw-bold  text-capitalize ${
+                                    readSingleInvoiceSingleUser?.payment_status ===
+                                    "success"
+                                      ? "text-success"
+                                      : readSingleInvoiceSingleUser?.payment_status ===
+                                        "cancel"
+                                      ? "text-danger"
+                                      : "text-danger"
+                                  }`}
+                                >
+                                  {readSingleInvoiceSingleUser?.payment_status}
+                                </span>
+
+
+                              </p>
+                              <p className="mb-1">
+                                Deliver Status:{" "}
+                                <span
+                                  className={`fw-bold text-capitalize ${
+                                    readSingleInvoiceSingleUser?.delivery_status ===
+                                    "delivered"
+                                      ? "text-success"
+                                      : readSingleInvoiceSingleUser?.delivery_status ===
+                                        "pending"
+                                      ? "text-warning"
+                                      : "text-danger"
+                                  }`}
+                                >
+                                  {readSingleInvoiceSingleUser?.delivery_status}
+                                </span>
+                              </p>
+                              <p className="mb-0">
+                                Total payable:{" "}
+                                <span className="fw-bold text-uppercase">
+                                  {readSingleInvoiceSingleUser?.payable}
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Table */}
+                          <div className="table-responsive invoice mb-4">
+                            <table className="table  align-middle">
+                              <thead className="table-light">
+                                <tr>
+                                  <th>Product</th>
+                                  <th className="text-center">Color</th>
+                                  <th className="text-center">Size</th>
+                                  <th className="text-center">Quantity</th>
+                                  <th className="text-center">Price</th>
+                                  <th className="text-end">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="text-dark">
+                                {readSingleInvoiceSingleUser?.invoiceProducts?.map((item,index)=>(
+                                    <tr key={index}>
+                                  <td className="text-start">{item?.product_name}</td>
+
+                                  <td>{item?.color}</td>
+                                  <td>{item?.size}</td>
+                                  <td>{item?.qty}</td>
+                                  <td>{item?.price}</td>
+                                  <td className="text-end">{item?.qty * item?.price}</td>
+                                </tr>
+
+                                ))}   
+                           
+
+
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Summary */}
+                          <div className="row justify-content-end">
+                            <div className="col-8">
+                              <p className="text-danger small fst-italic">
+                                {toWords.convert(Number(readSingleInvoiceSingleUser?.payable || 0))} {" "}
+                              </p>
+                            </div>
+                            <div className="col-4">
+                              <ul className="list-unstyled">
+                                <li className="d-flex justify-content-between mb-2">
+                                  <span>Subtotal:</span> <span>{readSingleInvoiceSingleUser?.total}</span>
+                                </li>
+                                <li className="d-flex justify-content-between mb-2">
+                                  <span>Vat (15%):</span>{" "}
+                                  <span>{readSingleInvoiceSingleUser?.vat} Tk</span>
+                                </li>
+                                <li className="d-flex justify-content-between mb-2">
+                                  <span>Shipping cost:</span>{" "}
+                                  <span>75 Tk.</span>
+                                </li>
+                                <li className="d-flex justify-content-between border-top pt-2 fw-bold">
+                                  <span>Total:</span> <span>{readSingleInvoiceSingleUser?.payable}</span>
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
+
+                          {/* Footer */}
+                          <div className="text-center mt-5 text-muted small">
+                            <p className="mb-1">Thank you for your purchase!</p>
+                            <p>
+                              This invoice was generated electronically and is
+                              valid without a signature.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  data-bs-dismiss="modal"
+                >
+                  Close
+                </button>
+                <button type="button" onClick={redirect} className="btn btn-primary">
+                  Back to Dashboard
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    </div>
+  );
+};
+
+export default AllOrders;
